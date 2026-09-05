@@ -1,0 +1,8 @@
+{
+  "name": "Админка Успешный",
+  "description": "Современная панель управления и мониторинга: отчёты, расходы на ИИ, лиды, аналитика, каталог и хозяйство.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
