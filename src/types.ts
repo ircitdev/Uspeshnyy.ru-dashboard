@@ -338,12 +338,13 @@ export interface SearchItem {
     | 'refresh-cw'
     | 'sparkles'
     | 'sun'
-    | 'moon';
+    | 'moon'
+    | 'send';
   keywords?: string[];
   tabTarget?: TabKey;
   targetSearchQuery?: string;
   targetStepId?: string;
-  actionType?: 'changePeriod' | 'refresh' | 'openKeyModal' | 'toggleDemo' | 'toggleTheme' | 'setTheme';
+  actionType?: 'changePeriod' | 'refresh' | 'openKeyModal' | 'toggleDemo' | 'toggleTheme' | 'setTheme' | 'openTelegramSettings';
   actionValue?: string;
 }
 
@@ -409,4 +410,31 @@ export interface AiBudgetSettings {
   alertEnabled: boolean;
   monthlyLimit: number;
   isThresholdAlertEnabled: boolean;
+  telegramId?: string;
+  telegramAlertsEnabled?: boolean;
+}
+
+export interface TelegramAlertPayload {
+  telegramId: string;
+  currentCost?: number;
+  currentExpense?: number;
+  limitUsd?: number;
+  limit?: number;
+  periodDays?: number;
+  isTest?: boolean;
+  exceededAmount?: number;
+  exceededPercentage?: number;
+  messageType?: 'budget_exceeded' | 'daily_report' | 'anomaly' | 'test';
+  customTitle?: string;
+  customDetails?: string;
+}
+
+export interface TelegramAlertResponse {
+  success: boolean;
+  simulated?: boolean;
+  message: string;
+  deliveredAt?: string;
+  previewText?: string;
+  chatId?: string;
+  error?: string;
 }

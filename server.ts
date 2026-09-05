@@ -88,48 +88,88 @@ async function startServer() {
 Сформируй ёмкий, профессиональный и полезный аналитический отчёт с кратким выводом, 3-4 ключевыми инсайтами и 3 практическими рекомендациями.
 `;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-        config: {
-          systemInstruction:
-            'Вы — опытный продуктовый аналитик и технический директор. Дайте объективную, конкретную оценку ситуации на русском языке, избегая шаблонной воды и рекламных клише.',
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              title: { type: Type.STRING, description: 'Заголовок саммари' },
-              executiveSummary: {
-                type: Type.STRING,
-                description: 'Краткий вывод по текущей ситуации (2-3 предложения)',
-              },
-              keyInsights: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING },
-                description: '3-4 ключевых инсайта с конкретными цифрами и динамикой',
-              },
-              recommendations: {
-                type: Type.ARRAY,
-                items: {
+      const candidateModels = [
+        process.env.GEMINI_MODEL,
+        'gemini-3.6-flash',
+        'gemini-flash-latest',
+        'gemini-flash-lite-latest',
+        'gemini-3.8-flash',
+      ].filter(Boolean) as string[];
+
+      let response: any = null;
+      let lastError: any = null;
+
+      for (const model of candidateModels) {
+        // Try each model with up to 2 attempts for transient 503/429
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            response = await ai.models.generateContent({
+              model,
+              contents: prompt,
+              config: {
+                systemInstruction:
+                  'Вы — опытный продуктовый аналитик и технический директор. Дайте объективную, конкретную оценку ситуации на русском языке, избегая шаблонной воды и рекламных клише.',
+                responseMimeType: 'application/json',
+                responseSchema: {
                   type: Type.OBJECT,
                   properties: {
-                    category: { type: Type.STRING, description: 'Категория рекомендации' },
-                    text: { type: Type.STRING, description: 'Конкретное действие' },
-                    impact: { type: Type.STRING, description: 'Ожидаемый эффект' },
+                    title: { type: Type.STRING, description: 'Заголовок саммари' },
+                    executiveSummary: {
+                      type: Type.STRING,
+                      description: 'Краткий вывод по текущей ситуации (2-3 предложения)',
+                    },
+                    keyInsights: {
+                      type: Type.ARRAY,
+                      items: { type: Type.STRING },
+                      description: '3-4 ключевых инсайта с конкретными цифрами и динамикой',
+                    },
+                    recommendations: {
+                      type: Type.ARRAY,
+                      items: {
+                        type: Type.OBJECT,
+                        properties: {
+                          category: { type: Type.STRING, description: 'Категория рекомендации' },
+                          text: { type: Type.STRING, description: 'Конкретное действие' },
+                          impact: { type: Type.STRING, description: 'Ожидаемый эффект' },
+                        },
+                        required: ['category', 'text', 'impact'],
+                      },
+                      description: '3 практические рекомендации',
+                    },
+                    status: {
+                      type: Type.STRING,
+                      description: 'Общий статус: positive, neutral, или warning',
+                    },
                   },
-                  required: ['category', 'text', 'impact'],
+                  required: ['title', 'executiveSummary', 'keyInsights', 'recommendations', 'status'],
                 },
-                description: '3 практические рекомендации',
               },
-              status: {
-                type: Type.STRING,
-                description: 'Общий статус: positive, neutral, или warning',
-              },
-            },
-            required: ['title', 'executiveSummary', 'keyInsights', 'recommendations', 'status'],
-          },
-        },
-      });
+            });
+            if (response?.text) {
+              break;
+            }
+          } catch (mErr: any) {
+            lastError = mErr;
+            const status = mErr?.status || mErr?.code || mErr?.error?.code;
+            const isTransient = status === 503 || status === 429 || mErr?.message?.includes('high demand') || mErr?.message?.includes('UNAVAILABLE');
+
+            if (isTransient && attempt === 1) {
+              // Quick backoff before retrying once
+              await new Promise((resolve) => setTimeout(resolve, 600));
+              continue;
+            }
+            break;
+          }
+        }
+
+        if (response?.text) {
+          break;
+        }
+      }
+
+      if (!response?.text) {
+        throw lastError || new Error('No valid response received from Gemini model');
+      }
 
       const parsed = JSON.parse(response.text?.trim() || '{}');
       return res.json({
@@ -144,6 +184,112 @@ async function startServer() {
       return res.json({
         ...fallback,
         errorNote: 'Использован локальный анализ (Gemini API вернул временную ошибку)',
+      });
+    }
+  });
+
+  // Telegram critical alert endpoint
+  app.post('/api/notifications/telegram', async (req, res) => {
+    const {
+      telegramId,
+      currentCost: rawCost,
+      currentExpense,
+      limitUsd: rawLimit,
+      limit,
+      periodDays = 30,
+      isTest = false,
+      customDetails,
+    } = req.body || {};
+
+    const currentCost = rawCost !== undefined ? Number(rawCost) : (currentExpense !== undefined ? Number(currentExpense) : 0);
+    const limitUsd = rawLimit !== undefined ? Number(rawLimit) : (limit !== undefined ? Number(limit) : 50);
+
+    if (!telegramId || typeof telegramId !== 'string' || !telegramId.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Не указан Telegram ID для отправки уведомления',
+      });
+    }
+
+    const cleanId = telegramId.trim();
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const now = new Date();
+    const timeString = now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const dateString = now.toLocaleDateString('ru-RU');
+
+    const costDiffPct =
+      limitUsd > 0 && currentCost > limitUsd
+        ? (((currentCost - limitUsd) / limitUsd) * 100).toFixed(1)
+        : '0';
+
+    let text = '';
+    if (isTest) {
+      text = `🔔 *Тестовое оповещение — Успешный бот*\n\n` +
+        `✅ Канал доставки критических уведомлений успешно подключен к Telegram ID: \`${cleanId}\`\n\n` +
+        `📊 *Текущие параметры мониторинга ИИ:*\n` +
+        `• Установленный лимит: *$${Number(limitUsd).toFixed(2)}*\n` +
+        `• Текущие расходы: *$${Number(currentCost).toFixed(2)}*\n` +
+        `• Статус триггера: *Активен*\n` +
+        `• Время проверки: *${dateString}, ${timeString}*\n\n` +
+        `При превышении лимита или выявлении критической аномалии бот моментально пришлёт экстренный сигнал сюда.`;
+    } else {
+      text = `🚨 *КРИТИЧЕСКОЕ ОПОВЕЩЕНИЕ: ПРЕВЫШЕН ЛИМИТ РАСХОДОВ НА ИИ*\n\n` +
+        `⚠️ Расходы на генерацию и вызовы нейросетей превысили установленный порог безопасности!\n\n` +
+        `💰 *Текущий расход:* *$${Number(currentCost).toFixed(2)}*\n` +
+        `🎯 *Лимит бюджета:* *$${Number(limitUsd).toFixed(2)}*\n` +
+        `📈 *Превышение:* *+${costDiffPct}%* (+$${Math.max(0, currentCost - limitUsd).toFixed(2)})\n` +
+        `⏱ *Отчётный интервал:* *${periodDays} дн.*\n` +
+        `🕒 *Время фиксации:* *${dateString} в ${timeString}*\n\n` +
+        (customDetails ? `ℹ️ *Детали:* ${customDetails}\n\n` : '') +
+        `🛠 *Рекомендация:* проверьте дашборд использования (Usage), оптимизируйте размер контекста или увеличьте лимит.`;
+    }
+
+    if (token) {
+      try {
+        const tgRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: cleanId,
+            text,
+            parse_mode: 'Markdown',
+          }),
+        });
+
+        const tgData: any = await tgRes.json();
+        if (!tgData.ok) {
+          console.warn('Telegram API responded with error:', tgData);
+          return res.status(400).json({
+            success: false,
+            error: `Ошибка Telegram API: ${tgData.description || 'Не удалось доставить сообщение'}`,
+            chatId: cleanId,
+          });
+        }
+
+        return res.json({
+          success: true,
+          simulated: false,
+          message: `Уведомление успешно доставлено в Telegram (ID: ${cleanId})`,
+          deliveredAt: new Date().toISOString(),
+          chatId: cleanId,
+          previewText: text,
+        });
+      } catch (err: any) {
+        console.error('Error contacting Telegram API:', err);
+        return res.status(500).json({
+          success: false,
+          error: `Сбой сети при отправке в Telegram: ${err.message}`,
+          chatId: cleanId,
+        });
+      }
+    } else {
+      return res.json({
+        success: true,
+        simulated: true,
+        message: `Telegram ID ${cleanId} сохранён. Тестовое оповещение успешно сформировано.`,
+        deliveredAt: new Date().toISOString(),
+        chatId: cleanId,
+        previewText: text,
       });
     }
   });

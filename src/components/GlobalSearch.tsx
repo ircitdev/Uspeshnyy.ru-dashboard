@@ -24,6 +24,7 @@ import {
   Volume2,
   Radio,
   Check,
+  Send,
 } from 'lucide-react';
 import { SearchItem, SearchCategory } from '../types';
 import { useToast } from '../context/ToastContext';
@@ -154,6 +155,10 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({
           matchingItem = items.find(
             (it) => it.actionType === 'changePeriod' && it.actionValue === action.days
           );
+        } else if (action.type === 'settings') {
+          matchingItem = items.find((it) => it.actionType === 'openKeyModal');
+        } else if (action.type === 'telegram') {
+          matchingItem = items.find((it) => it.actionType === 'openTelegramSettings');
         }
 
         if (matchingItem) {
@@ -422,6 +427,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({
     else if (type === 'sparkles') iconNode = <Sparkles className={iconClass} />;
     else if (type === 'sun') iconNode = <Sun className={iconClass} />;
     else if (type === 'moon') iconNode = <Moon className={iconClass} />;
+    else if (type === 'send') iconNode = <Send className={iconClass} />;
 
     return (
       <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${colorClasses}`}>

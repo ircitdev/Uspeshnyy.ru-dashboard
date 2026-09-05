@@ -13,9 +13,13 @@ import {
   Check,
   Bell,
   TrendingUp,
+  Send,
+  Loader2,
 } from 'lucide-react';
 import { getAiBudgetSettings, setAiBudgetSettings } from '../../services/budgetSettings';
+import { sendTelegramNotification } from '../../services/telegramNotifications';
 import { useToast } from '../../context/ToastContext';
+import { UsageCostPieChart } from '../charts/UsageCostPieChart';
 
 interface UsageViewProps {
   data: UsageData;
@@ -57,12 +61,68 @@ export const UsageView: React.FC<UsageViewProps> = ({ data }) => {
   );
 
   // Notify once on mount if budget already exceeded
+  const [isSendingTgAlert, setIsSendingTgAlert] = useState(false);
+  const [tgAlertSent, setTgAlertSent] = useState(false);
+
+  const handleSendTelegramAlert = async () => {
+    if (!budgetSettings.telegramId?.trim()) {
+      toast.error('Не указан Telegram ID', 'Нажмите кнопку с ключом на верхней панели и укажите ваш ID во вкладке Telegram.');
+      return;
+    }
+
+    setIsSendingTgAlert(true);
+    try {
+      const res = await sendTelegramNotification({
+        telegramId: budgetSettings.telegramId.trim(),
+        currentExpense: total.cost,
+        limit: budgetSettings.monthlyLimit,
+        exceededAmount: Math.max(0, total.cost - budgetSettings.monthlyLimit),
+        exceededPercentage: Math.max(0, ((total.cost - budgetSettings.monthlyLimit) / budgetSettings.monthlyLimit) * 100),
+      });
+
+      if (res.success) {
+        setTgAlertSent(true);
+        toast.success(
+          'Оповещение в Telegram отправлено',
+          res.simulated
+            ? `Смоделирована отправка для ID ${budgetSettings.telegramId} (Демо режим)`
+            : `Критический алерт доставлен в Telegram получателю ${budgetSettings.telegramId}`
+        );
+      } else {
+        toast.error('Ошибка отправки в Telegram', res.message);
+      }
+    } catch (err: any) {
+      toast.error('Сбой отправки', err?.message || 'Не удалось связаться с сервером');
+    } finally {
+      setIsSendingTgAlert(false);
+    }
+  };
+
   useEffect(() => {
     if (isBudgetExceeded) {
       toast.warning(
         'Превышен лимит расходов на ИИ!',
         `Текущие расходы $${total.cost.toFixed(2)} превышают установленный порог в $${budgetSettings.monthlyLimit}`
       );
+
+      // Auto-send Telegram alert once per session if enabled
+      if (budgetSettings.telegramAlertsEnabled && budgetSettings.telegramId?.trim()) {
+        const sessionKey = `tg_alert_sent_${Math.round(total.cost)}`;
+        if (!sessionStorage.getItem(sessionKey)) {
+          sessionStorage.setItem(sessionKey, '1');
+          sendTelegramNotification({
+            telegramId: budgetSettings.telegramId.trim(),
+            currentExpense: total.cost,
+            limit: budgetSettings.monthlyLimit,
+            exceededAmount: Math.max(0, total.cost - budgetSettings.monthlyLimit),
+            exceededPercentage: Math.max(0, ((total.cost - budgetSettings.monthlyLimit) / budgetSettings.monthlyLimit) * 100),
+          }).then((res) => {
+            if (res.success) {
+              setTgAlertSent(true);
+            }
+          }).catch(() => {});
+        }
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -170,6 +230,29 @@ export const UsageView: React.FC<UsageViewProps> = ({ data }) => {
               <Bell className="w-3.5 h-3.5" />
               <span>{budgetSettings.isThresholdAlertEnabled ? 'Оповещения вкл' : 'Оповещения выкл'}</span>
             </button>
+
+            {budgetSettings.telegramId ? (
+              <button
+                type="button"
+                onClick={handleSendTelegramAlert}
+                disabled={isSendingTgAlert}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-colors cursor-pointer ${
+                  isBudgetExceeded
+                    ? 'bg-rose-600 hover:bg-rose-700 text-white border-rose-700 shadow-xs'
+                    : 'bg-sky-50 dark:bg-sky-950/50 hover:bg-sky-100 dark:hover:bg-sky-900 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800'
+                }`}
+                title={`Отправить критический алерт на Telegram ID: ${budgetSettings.telegramId}`}
+              >
+                {isSendingTgAlert ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Send className="w-3.5 h-3.5" />
+                )}
+                <span>
+                  {tgAlertSent ? 'Алерт отправлен' : 'Алерт в TG'}
+                </span>
+              </button>
+            ) : null}
 
             <button
               type="button"
@@ -340,6 +423,13 @@ export const UsageView: React.FC<UsageViewProps> = ({ data }) => {
           <span>{byDay[byDay.length - 1]?.day || ''}</span>
         </div>
       </div>
+
+      {/* Detailed AI Models & Services Cost Breakdown (Recharts PieChart) */}
+      <UsageCostPieChart
+        providers={providers}
+        purposes={purposes}
+        totalCost={total.cost}
+      />
 
       {/* Two Breakdown Tables: Providers and Purposes */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

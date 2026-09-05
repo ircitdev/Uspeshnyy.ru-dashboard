@@ -7,6 +7,7 @@ export type VoiceAction =
   | { type: 'theme'; theme: ThemeMode; label: string; phrase: string }
   | { type: 'search'; phrase: string }
   | { type: 'settings'; phrase: string }
+  | { type: 'telegram'; phrase: string }
   | { type: 'unknown'; rawText: string };
 
 interface TabMatchConfig {
@@ -34,7 +35,7 @@ const TAB_MATCHERS: TabMatchConfig[] = [
   {
     tab: 'usage',
     label: 'Расходы ИИ',
-    keywords: ['расход', 'ии', 'трат', 'бюджет', 'токен', 'модел', 'usage', 'gemini'],
+    keywords: ['расход', 'ии', 'трат', 'бюджет', 'токен', 'модел', 'usage', 'gemini', 'круг', 'диаграмм', 'пайчарт'],
   },
   {
     tab: 'leads',
@@ -101,7 +102,13 @@ export function parseVoiceCommand(rawTranscript: string): VoiceAction {
     return { type: 'search', phrase: rawTranscript };
   }
 
-  // 3. Settings / Key modal
+  // 3. Telegram notifications settings
+  const telegramKeywords = ['телеграм', 'telegram', 'уведомления', 'алерт', 'тг'];
+  if (telegramKeywords.some((kw) => norm.includes(kw))) {
+    return { type: 'telegram', phrase: rawTranscript };
+  }
+
+  // 4. Settings / Key modal
   const settingsKeywords = ['настройк', 'ключ', 'ввести ключ', 'settings'];
   if (settingsKeywords.some((kw) => norm.includes(kw))) {
     return { type: 'settings', phrase: rawTranscript };

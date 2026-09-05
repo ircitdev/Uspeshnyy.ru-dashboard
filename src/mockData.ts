@@ -55,7 +55,7 @@ export const MOCK_REPORTS: ReportsResponse = {
       cost_rub: 9.42,
       link: 'https://uspeshnyy.ru/r/9480',
       spend: {
-        models: [{ provider: 'Google', model: 'gemini-2.5-flash' }],
+        models: [{ provider: 'Google', model: 'gemini-3.6-flash' }],
         tin: 12400,
         tout: 2410,
         cost: 0.098,
@@ -150,7 +150,7 @@ export const MOCK_REPORTS: ReportsResponse = {
       cost_rub: 13.90,
       link: 'https://uspeshnyy.ru/r/9475',
       spend: {
-        models: [{ provider: 'Google', model: 'gemini-2.5-flash' }],
+        models: [{ provider: 'Google', model: 'gemini-3.6-flash' }],
         tin: 8200,
         tout: 1680,
         cost: 0.082,
@@ -341,9 +341,9 @@ export const MOCK_USAGE: UsageData = {
     },
     {
       provider: 'Google GenAI',
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.6-flash',
       calls: 580,
-      fails: 2,
+      fails: 0,
       cost: 10.45,
     },
     {

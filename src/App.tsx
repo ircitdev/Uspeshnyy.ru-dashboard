@@ -33,6 +33,7 @@ export default function App() {
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
   const [theme, setTheme] = useState<ThemeMode>(() => getStoredTheme());
+  const [keyModalTab, setKeyModalTab] = useState<'theme' | 'api' | 'telegram'>('theme');
 
   // Apply theme class and data-theme attributes whenever theme changes
   useEffect(() => {
@@ -124,6 +125,10 @@ export default function App() {
       } else if (item.actionType === 'refresh') {
         loadData();
       } else if (item.actionType === 'openKeyModal') {
+        setKeyModalTab('api');
+        setIsKeyModalOpen(true);
+      } else if (item.actionType === 'openTelegramSettings') {
+        setKeyModalTab('telegram');
         setIsKeyModalOpen(true);
       } else if (item.actionType === 'toggleDemo') {
         setIsDemoMode((prev) => !prev);
@@ -176,7 +181,10 @@ export default function App() {
               isLoading={isLoading}
               isLive={isLiveConnection}
               hasKey={!!adminKey}
-              onOpenKeyModal={() => setIsKeyModalOpen(true)}
+              onOpenKeyModal={() => {
+                setKeyModalTab('api');
+                setIsKeyModalOpen(true);
+              }}
               onOpenSearch={() => setIsSearchOpen(true)}
               theme={theme}
               onThemeChange={setTheme}
@@ -286,6 +294,7 @@ export default function App() {
         onToggleDemo={setIsDemoMode}
         theme={theme}
         onThemeChange={setTheme}
+        defaultTab={keyModalTab}
       />
 
       {/* Global Toast Notification System */}

@@ -42,9 +42,9 @@ export function buildSearchIndex(activeReports?: any[]): SearchItem[] {
     {
       id: 'usage',
       title: 'Расход API',
-      subtitle: 'Затраты на ИИ-модели, токены, сбои провайдеров и динамика',
+      subtitle: 'Затраты на ИИ-модели, токены, круговой график и сбои провайдеров',
       badge: 'Раздел',
-      keywords: ['llm', 'расходы', 'токены', 'api', 'claude', 'gemini', 'deepseek', 'openrouter', 'деньги'],
+      keywords: ['llm', 'расходы', 'токены', 'api', 'claude', 'gemini', 'deepseek', 'openrouter', 'деньги', 'круговой график', 'диаграмма', 'pie chart', 'распределение'],
     },
     {
       id: 'leads',
@@ -305,6 +305,15 @@ export function buildSearchIndex(activeReports?: any[]): SearchItem[] {
       iconType: 'key',
       actionType: 'openKeyModal',
       keywords: ['ключ', 'токен', 'api key', 'bearer', 'авторизация', 'настройки'],
+    },
+    {
+      id: 'act-telegram-settings',
+      title: 'Уведомления Telegram (Критические алерты ИИ)',
+      subtitle: 'Указать Telegram ID для получения экстренных оповещений о расходах на ИИ',
+      badge: 'Алерты',
+      iconType: 'send',
+      actionType: 'openTelegramSettings',
+      keywords: ['telegram', 'телеграм', 'тг', 'алерты', 'расходы', 'лимит', 'уведомления', 'chat id', 'бот'],
     },
     {
       id: 'act-toggle-demo',

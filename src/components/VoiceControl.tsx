@@ -125,6 +125,14 @@ export const VoiceControl: React.FC<VoiceControlProps> = ({
           }
           break;
 
+        case 'telegram':
+          setLastAction('Telegram настройки');
+          if (onOpenKeyModal) {
+            onOpenKeyModal();
+            toast.info('Голосовая команда', 'Открыты настройки Telegram');
+          }
+          break;
+
         case 'unknown':
           audioFeedback.playError();
           setLastAction(`Неизвестно: "${action.rawText}"`);

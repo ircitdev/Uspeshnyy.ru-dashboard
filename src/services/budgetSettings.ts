@@ -7,6 +7,8 @@ export const DEFAULT_BUDGET_SETTINGS: AiBudgetSettings = {
   alertEnabled: true,
   monthlyLimit: 50,
   isThresholdAlertEnabled: true,
+  telegramId: '',
+  telegramAlertsEnabled: true,
 };
 
 export function getStoredAiBudget(): AiBudgetSettings {
@@ -26,11 +28,20 @@ export function getStoredAiBudget(): AiBudgetSettings {
         ? Boolean(parsed.isThresholdAlertEnabled)
         : parsed.alertEnabled !== false;
 
+    const telegramId =
+      typeof parsed.telegramId === 'string' ? parsed.telegramId.trim() : '';
+    const telegramAlertsEnabled =
+      parsed.telegramAlertsEnabled !== undefined
+        ? Boolean(parsed.telegramAlertsEnabled)
+        : true;
+
     return {
       limitUsd: limit,
       alertEnabled: alertOn,
       monthlyLimit: limit,
       isThresholdAlertEnabled: alertOn,
+      telegramId,
+      telegramAlertsEnabled,
     };
   } catch {
     return DEFAULT_BUDGET_SETTINGS;
@@ -54,11 +65,23 @@ export function setStoredAiBudget(settings: Partial<AiBudgetSettings>): AiBudget
       ? settings.alertEnabled
       : current.isThresholdAlertEnabled;
 
+  const telegramId =
+    settings.telegramId !== undefined
+      ? settings.telegramId.trim()
+      : current.telegramId || '';
+
+  const telegramAlertsEnabled =
+    settings.telegramAlertsEnabled !== undefined
+      ? settings.telegramAlertsEnabled
+      : current.telegramAlertsEnabled !== false;
+
   const updated: AiBudgetSettings = {
     limitUsd: limit,
     alertEnabled: alertOn,
     monthlyLimit: limit,
     isThresholdAlertEnabled: alertOn,
+    telegramId,
+    telegramAlertsEnabled,
   };
 
   try {
